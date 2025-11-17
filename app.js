@@ -3,6 +3,10 @@ const bodyParser = require('body-parser')
 const { PDFParse } = require('pdf-parse');
 const OpenAI = require("openai");
 
+require('dotenv').config();
+const apiKey = process.env.OPEN_AI_KEY;
+
+
 
 const schema = {
   type: "object",
@@ -51,7 +55,7 @@ app.post('/pdf/extract', async (req, res) => {
 
     try {
     const openai = new OpenAI({
-      apiKey: ''
+      apiKey: apiKey
     });
     const { dataUrl, fileName } = req.body;
 
