@@ -170,6 +170,10 @@ Here is the text: ${chunk}
   }
 })
 
+app.get('/do-not-go-to-sleep', (req, res) => {
+  res.send('I am not going to sleep')
+})
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
