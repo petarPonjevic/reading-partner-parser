@@ -7,17 +7,16 @@ require('dotenv').config();
 const apiKey = process.env.OPEN_AI_KEY;
 
 
-
 const schema = {
   type: "object",
-  additionalProperties: false,   // obavezno
+  additionalProperties: false,   
   properties: {
     lines: {
       type: "array",
-      additionalProperties: false, // obavezno za svaki element u array
+      additionalProperties: false, 
       items: {
         type: "object",
-        additionalProperties: false, // obavezno
+        additionalProperties: false,
         properties: {
           lineId: { type: "string" },
           order: { type: "number" },
@@ -38,17 +37,6 @@ app.use(bodyParser.json())
 app.get('/', (req, res) => {
   res.send('Hello World!')
 })
-
-function splitIntoChunks(text, chunkSize = 10000) {
-  const chunks = [];
-  let index = 0;
-  while (index < text.length) {
-    chunks.push(text.slice(index, index + chunkSize));
-    index += chunkSize;
-  }
-  return chunks;
-}
-
 
 app.post('/pdf/extract', async (req, res) => {
   const start = Date.now();
@@ -168,10 +156,6 @@ Here is the text: ${chunk}
       error: err.message,
     });
   }
-})
-
-app.get('/do-not-go-to-sleep', (req, res) => {
-  res.send('I am not going to sleep')
 })
 
 app.listen(port, () => {
