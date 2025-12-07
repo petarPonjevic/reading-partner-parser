@@ -2,6 +2,11 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const { PDFParse } = require('pdf-parse');
 const OpenAI = require("openai");
+const fs = require('fs');
+const path = require('path');
+const ffmpeg = require('fluent-ffmpeg');
+const { v4: uuidv4 } = require('uuid');
+
 
 require('dotenv').config();
 const apiKey = process.env.OPEN_AI_KEY;
@@ -158,11 +163,51 @@ Here is the text: ${chunk}
   }
 })
 
+
+// -----------------------------------------------------
+// POST /audio/merge
+// Receives: { files: [url1, url2, ...] }
+// Returns: merged MP3 as blob
+// -----------------------------------------------------
+app.post('/audio/merge', async (req, res) => {
+  try {
+    const { files } = req.body;
+
+    if (!files || !Array.isArray(files) || files.length < 2) {
+      return res.status(400).json({ error: 'Provide "files" array with at least 2 MP3 URLs' });
+    }
+
+    // Download all files to temp folder
+    const tempFiles = [];
+    for (const url of files) {
+      const tempPath = path.join(__dirname, `temp_${uuidv4()}.mp3`);
+      await downloadFile(url, tempPath);
+      tempFiles.push(tempPath);
+    }
+
+    // Merge MP3s
+    const mergedPath = await mergeMp3Files(tempFiles);
+
+    // Read merged file and send as blob
+    const mergedBuffer = await fs.promises.readFile(mergedPath);
+
+    // Clean up temp files
+    [...tempFiles, mergedPath].forEach(f => fs.existsSync(f) && fs.unlinkSync(f));
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Disposition', 'attachment; filename="merged.mp3"');
+    res.send(mergedBuffer);
+
+  } catch (err) {
+    console.error('MP3 merge error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
-
-
 
 
 function optimizeScript(script) {
@@ -195,4 +240,41 @@ function optimizeScript(script) {
 
   // 3. Join lines with single space where appropriate
   return optimizedLines.join('\n');
+}
+
+// -----------------------------------------------------
+// Helper: download a file from URL to temp folder
+// -----------------------------------------------------
+async function downloadFile(url, destPath) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download ${url}`);
+  const buffer = await res.arrayBuffer();
+  await fs.promises.writeFile(destPath, Buffer.from(buffer));
+  return destPath;
+}
+
+
+async function mergeMp3Files(inputPaths) {
+  return new Promise((resolve, reject) => {
+    // Create a temporary file list for FFmpeg concat
+    const listFile = path.join(__dirname, `mp3_list_${uuidv4()}.txt`);
+    const listContent = inputPaths.map(p => `file '${p}'`).join('\n');
+    fs.writeFileSync(listFile, listContent);
+
+    const outputFile = path.join(__dirname, `merged_${uuidv4()}.mp3`);
+
+    ffmpeg()
+      .input(listFile)
+      .inputOptions(['-f concat', '-safe 0'])
+      .outputOptions(['-c copy'])
+      .on('end', () => {
+        fs.unlinkSync(listFile); // remove temp list
+        resolve(outputFile);
+      })
+      .on('error', (err) => {
+        fs.unlinkSync(listFile);
+        reject(err);
+      })
+      .save(outputFile);
+  });
 }
